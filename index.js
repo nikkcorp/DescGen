@@ -54,11 +54,12 @@ async function checkProductExistence(sku) {
       } else {
         productExists = true;
 
+        // Extract product features
         const features = await page.$$eval('#featurebullets_feature_div .a-unordered-list .a-list-item', elements => {
           return elements.map(el => el.textContent.trim());
         });
 
-        // Attempt to find the product description using different selectors
+        // Extract product description
         let productDescription = '';
         try {
           productDescription = await page.$eval('#productDescription p', el => el ? el.textContent.trim() : '');
@@ -71,32 +72,71 @@ async function checkProductExistence(sku) {
           }
         }
 
-        // Updated details extraction using new selectors
-        const details = await page.$$eval('tr', rows => {
-          const detailsObj = {};
+        // Extract product details from the "prodDetTable"
+        const tableDetails = await page.$$eval('.a-keyvalue.prodDetTable tbody tr', rows => {
+          const details = {};
           rows.forEach(row => {
-            const keyElement = row.querySelector('th.a-color-secondary.a-size-base.prodDetSectionEntry');
-            const valueElement = row.querySelector('td.a-size-base.prodDetAttrValue');
-            const key = keyElement?.textContent.trim();
-            const value = valueElement?.textContent.trim();
+            const key = row.querySelector('th') ? row.querySelector('th').textContent.trim() : '';
+            const value = row.querySelector('td') ? row.querySelector('td').textContent.trim() : '';
             if (key && value) {
-              detailsObj[key] = value;
+              details[key] = value;
             }
           });
-          return detailsObj;
+          return details;
+        });
+
+        // Extract product description list items
+        const descriptionList = await page.$$eval('.a-unordered-list.a-vertical.a-spacing-small .a-list-item', items => {
+          return items.map(item => item.textContent.trim());
+        });
+
+        // Extract product details from the "detailBulletsWrapper_feature_div"
+        const detailBullets = await page.$$eval('#detailBulletsWrapper_feature_div .detail-bullet-list .a-list-item', items => {
+          const details = {};
+          items.forEach(item => {
+            const boldText = item.querySelector('.a-text-bold');
+            const valueText = item.querySelector('span:not(.a-text-bold)');
+            if (boldText && valueText) {
+              const key = boldText.textContent.trim();
+              const value = valueText.textContent.trim();
+              details[key] = value;
+            }
+          });
+          return details;
         });
 
         console.log(`\nAmazon ${country} - ${productUrl}\n`);
         console.log(`Product Title: ${productTitle}`);
+        
         if (productDescription) {
           console.log(`Product Description: ${productDescription}`);
         }
-        console.log(`Product Features:`);
-        features.forEach(feature => console.log(`- ${feature}`));
-        console.log(`Product Details:`);
-        Object.entries(details).forEach(([key, value]) => {
-          console.log(`${key}: ${value}`);
-        });
+
+        if (features) {
+          console.log(`Product Features:`);
+          features.forEach(feature => console.log(`- ${feature}`));
+        }
+
+        if (tableDetails) {
+          console.log(`Product Table Details:`);
+          Object.entries(tableDetails).forEach(([key, value]) => {
+            console.log(`${key}: ${value}`);
+          });
+        }
+
+        if (descriptionList) {
+          console.log(`Product Description List:`);
+          descriptionList.forEach((item, index) => {
+            console.log(`${index + 1}. ${item}`);
+          });
+        }
+
+        if (detailBullets) {
+          console.log(`Product Detail Bullets:`);
+          Object.entries(detailBullets).forEach(([key, value]) => {
+            console.log(`${key}: ${value}`);
+          });
+        }
 
         break;
       }
@@ -116,7 +156,7 @@ async function checkProductExistence(sku) {
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: 'Please enter SKU: '
+  prompt: '\n\nPlease enter SKU: '
 });
 
 rl.prompt();
@@ -133,4 +173,4 @@ rl.on('line', async (input) => {
   await checkProductExistence(sku);
 
   rl.prompt(); // Prompt for the next SKU
-}).on
+});
